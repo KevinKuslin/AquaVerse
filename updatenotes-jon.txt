@@ -1,0 +1,4 @@
+Minor Push
+
+1. Added logo picture for app icon
+2. revising pubspec.yaml
