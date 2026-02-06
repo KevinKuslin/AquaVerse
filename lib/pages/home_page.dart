@@ -13,7 +13,6 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  // Default name kalau belum ke-load atau user anonim
   String userName = "Diver"; 
   
   late Future<List<News>> _newsFuture = fetchNews();
@@ -28,22 +27,18 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    _getUserInfo(); // <--- Ambil nama user di sini
+    _getUserInfo(); 
     _startAutoScroll();
   }
 
-  // Fungsi baru buat ambil nama depan user
   void _getUserInfo() {
     final user = Supabase.instance.client.auth.currentUser;
     
-    // Cek apakah ada user login & punya metadata
     if (user != null && user.userMetadata != null) {
-      // Ambil 'name' yang disimpen pas register
       final String? fullName = user.userMetadata!['name'];
       
       if (fullName != null && fullName.isNotEmpty) {
         setState(() {
-          // Split spasi, ambil kata pertama (Index 0)
           userName = fullName.split(' ')[0];
         });
       }
@@ -58,7 +53,6 @@ class _HomePageState extends State<HomePage> {
         } else {
           _currentPage = 0;
         }
-        // Cek pageController masih nempel di widget gak
         if (_pageController.hasClients) {
           _pageController.animateToPage(
             _currentPage,
@@ -107,7 +101,6 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _refreshData() async {
-    // Kita refresh berita, tapi nama user biasanya gak berubah jadi gak perlu dipanggil ulang
     _newsFuture = fetchNews();
     setState(() {});
   }
@@ -146,7 +139,7 @@ class _HomePageState extends State<HomePage> {
                         color: const Color.fromARGB(255, 225, 251, 254),
                         borderRadius: const BorderRadius.only(
                           bottomLeft: Radius.circular(35),
-                          bottomRight: Radius.circular(-35), // Note: Radius negatif mungkin gak ngefek di beberapa versi flutter, tapi gw biarin sesuai aslinya
+                          bottomRight: Radius.circular(-35),
                         ),
                         image: DecorationImage(
                           image: NetworkImage(

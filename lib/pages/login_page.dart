@@ -11,7 +11,6 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  // Gw rename jadi identifierController biar jelas fungsinya buat Email/Username
   final _identifierController = TextEditingController(); 
   final _passwordController = TextEditingController(); 
 
@@ -46,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => _isLoading = true);
 
     try {
-      await supabase.auth.signOut(); // Bersihin sesi lama
+      await supabase.auth.signOut();
 
       String emailToLogin = input;
 
@@ -56,24 +55,21 @@ class _LoginPageState extends State<LoginPage> {
               .from('profiles')
               .select('email')
               .eq('username', input)
-              .maybeSingle(); // Pake maybeSingle biar gak error kalo gak ketemu
+              .maybeSingle();
 
           if (result == null) {
             throw AuthException('Username tidak ditemukan!');
           }
 
-          // Kalo ketemu, kita pake emailnya buat login
           emailToLogin = result['email'];
         } catch (e) {
-          // Kalau error pas nyari username (misal table gak ada atau RLS ke-block)
-          if (e is AuthException) rethrow; // Lempar error "Username tidak ditemukan"
+          if (e is AuthException) rethrow;
           
           print('Error lookup username: $e'); 
           throw AuthException('Gagal memverifikasi username. Gunakan Email saja.');
         }
       }
 
-      // 3. Proses Login (Selalu pakai Email di sini)
       final response = await supabase.auth.signInWithPassword(
         email: emailToLogin,
         password: password
@@ -173,13 +169,12 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                       const SizedBox(height: 20,), 
                       
-                      // UBAH TEXT LABEL
                       const Text("E-mail / Username"), 
                       const SizedBox(height: 5,), 
                       TextField(
-                        controller: _identifierController, // Pake controller yang baru
+                        controller: _identifierController,
                         decoration: InputDecoration(
-                          hintText: "Masukkan E-mail atau Username...", // Hint disesuaikan
+                          hintText: "Masukkan E-mail atau Username...",
                           filled: true, 
                           fillColor: Colors.grey[200], 
                           border: OutlineInputBorder(
@@ -278,7 +273,6 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 class WaveClipper extends CustomClipper<Path> {
-  // ... (Bagian WaveClipper sama persis kaya sebelumnya)
   @override
   Path getClip(Size size) {
     Path path = Path();
