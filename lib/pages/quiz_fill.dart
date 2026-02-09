@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; 
+import 'dart:async'; // Buat timer 
+import 'quiz_result.dart'; 
 
 class QuizFill extends StatefulWidget {
   const QuizFill({super.key}); 
@@ -97,91 +99,233 @@ class BuildQuizUI extends StatefulWidget {
 
 class _BuildQuizState extends State<BuildQuizUI> {
   int currentIndex = 0; 
+  int? selectedChoiceIndex; 
+  bool hasAnswered = false; 
+  int score = 0; 
+  bool isProcessing=false; 
+  int totalTime=10; 
+  int remainingTime=10; 
+  Timer? timer; 
+
+  @override
+  void initState(){
+    super.initState(); 
+    startTimer(); 
+  }
+
+  void startTimer(){
+    final question = widget.quizData[currentIndex]; 
+    totalTime = question['time_limit'];
+    remainingTime = totalTime; 
+    timer?.cancel();
+    timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (mounted) {
+        setState(() {
+          remainingTime--;
+          if (remainingTime <= 0) {
+            // Auto submit jawaban jika waktu habis
+            hasAnswered = true;
+            submitAnswer();  // fungsi untuk menangani jawaban
+            timer?.cancel();
+          }
+        });
+      }
+    });
+  }
+
+  void submitAnswer() {
+    // misal update skor atau logika jawaban benar/salah
+    // lalu lanjut ke soal berikutnya
+    Future.delayed(const Duration(seconds: 1), () {
+      if (!mounted) return; // halaman sudah tidak ada, skip
+
+      if (currentIndex + 1 < widget.quizData.length) {
+        setState(() {
+          currentIndex++;
+          selectedChoiceIndex = null;
+          hasAnswered = false;
+        });
+        startTimer(); // reset timer untuk soal baru
+      } else {
+        // soal habis, arahkan ke halaman hasil
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => QuizResult(
+              totalQuestions: widget.quizData.length,
+              score: score,
+            ),
+          ),
+        );
+      }
+    });
+
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context){
 
     final question = widget.quizData[currentIndex]; 
     final String questionText = question['question_text'];
-    final int timeLimit = question['time_limit'];
-    final List<dynamic> choices = question['quiz_choices'] ?? []; 
     final String quizBackgroundUrl = widget.quizBackgroundUrl; 
 
+    final List<dynamic> choices = question['quiz_choices'] ?? [];
+
+    final double progress = remainingTime / totalTime; 
+
     return SafeArea(
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          return Stack(
-            children: [
-              Container(
-                color: const Color.fromRGBO(217, 246, 252, 1),
-              ), 
+      child: Stack(
+        children: [
+          Container(
+            color: const Color.fromRGBO(217, 246, 252, 1),
+          ),
 
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 260,
-                child: Container(
-                  padding: const EdgeInsets.only(top: 40),
-                  decoration: BoxDecoration(
-                    
-                    image: DecorationImage(
-                      image: NetworkImage(quizBackgroundUrl), 
-                      fit: BoxFit.cover
-                    ),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 260,
+            child: Container(
+              padding: const EdgeInsets.only(top: 40),
+              decoration: BoxDecoration(
+                image: DecorationImage(
+                  image: NetworkImage(quizBackgroundUrl),
+                  fit: BoxFit.cover,
+                ),
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(40),
+                  bottomRight: Radius.circular(40),
+                ),
+              ),
+            ),
+          ),
 
-                    borderRadius: BorderRadius.only(
-                      bottomLeft: Radius.circular(40), 
-                      bottomRight: Radius.circular(40)
-                    ),
+          const FrostedGlass(),
 
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.15),
-                        offset: const Offset(0, 4),
-                        blurRadius: 8,
-                      )
+          Positioned.fill(
+            top: 55, 
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 60, 20, 20),
+              child: Column(
+                children: [
+                  Stack(
+                    alignment: Alignment.topCenter,
+                    clipBehavior: Clip.none, 
+                    children: [
+
+                      Padding(
+                        padding: const EdgeInsets.only(top: 45), 
+                        child: ProgressAndQuestionCard(
+                          questionText: questionText,
+                          currentIndex: currentIndex
+                        ),
+                      ),
+
+                      Positioned(
+                        top: 0,
+                        child: QuestionNumber(
+                          currentIndex: currentIndex, 
+                          progress: progress, 
+                          remainingTime: remainingTime,
+                        ),
+                      ),
                     ],
                   ),
-                )
-              ), 
 
-              const FrostedGlass(),
+                  const SizedBox(height: 20),
 
-              Positioned(
-                top: 150,
-                left: 20, 
-                right: 20, 
-                child: ProgressAndQuestionCard(
-                  questionText: questionText, 
-                  currentIndex: currentIndex
-                ),
-              ), 
+                  ChoiceCard(
+                    choices: choices,
+                    selectedIndex: selectedChoiceIndex, 
+                    onChoiceSelected: (index) {
+                      if(!hasAnswered){
+                        setState(() {
+                        selectedChoiceIndex = index; 
+                      });
+                      }
+                    }, 
+                    hasAnswered: hasAnswered
+                  ),
 
-              Positioned(
-                top: 105, 
-                left: 20, 
-                right: 20, 
-                child: Align(
-                  alignment: Alignment.center, 
-                  child: QuestionNumber(),
-                )
-              ), 
+                  const SizedBox(height: 20),
 
+                  ElevatedButton(
+                    onPressed: (){
+                      
+                      if(selectedChoiceIndex == null || isProcessing){
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Pilih jawaban terlebih dahulu!')),
+                        );
+                        return;
+                      }
 
-              Positioned(
-                top: 370, 
-                left: 20, 
-                right: 20, 
-                child: ChoiceCard(
-                  choices: choices, 
-                ),
-              )
-            ],
-          );
-        }
+                      setState(() {
+                        hasAnswered = true; 
+                        isProcessing=true; 
+
+                        final selectedChoice = widget.quizData[currentIndex]['quiz_choices'][selectedChoiceIndex]; 
+
+                        if(selectedChoice['is_correct'] == true){
+                          score++; 
+                        }
+
+                        Future.delayed(const Duration(seconds: 1), () {
+                          setState(() {
+                            if (currentIndex < widget.quizData.length - 1) {
+                              // soal berikutnya
+                              currentIndex++;
+                              selectedChoiceIndex = null;
+                              hasAnswered = false;
+                              isProcessing = false; 
+                            } else {
+                              // semua soal selesai, navigasi ke halaman hasil
+                              Navigator.pushReplacement(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => QuizResult(
+                                    totalQuestions: widget.quizData.length,
+                                    score: score,
+                                  ),
+                                ),
+                              );
+                            }
+                          });
+                        });
+                      });
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white, 
+                      elevation: 2, 
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadiusGeometry.circular(10)
+                      ), 
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 40, 
+                        vertical: 7
+                      )
+                    ),
+                    
+                    child: Text('Cek Jawaban', style: TextStyle(
+                      fontSize: 24, 
+                      fontFamily: 'Afacad', 
+                      fontWeight: FontWeight.w700, 
+                      color: const Color.fromRGBO(118, 181, 193, 1)
+                    ),),
+                  )
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
-    ); 
+    );
+
   }
 }
 
@@ -228,7 +372,6 @@ class ProgressAndQuestionCard extends StatelessWidget{
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 190, 
       width: double.infinity, 
       decoration: BoxDecoration(
         color: Colors.white, 
@@ -262,7 +405,9 @@ class ProgressAndQuestionCard extends StatelessWidget{
               color: Colors.black
               )
             ),
-          )
+          ), 
+
+          const SizedBox(height: 25,)
 
         ],
       ),
@@ -271,7 +416,16 @@ class ProgressAndQuestionCard extends StatelessWidget{
 }
 
 class QuestionNumber extends StatelessWidget {
-  const QuestionNumber({super.key}); 
+  final int currentIndex; 
+  final double progress; 
+  final int remainingTime; 
+
+  const QuestionNumber({
+    super.key, 
+    required this.currentIndex, 
+    required this.progress,
+    required this.remainingTime
+  }); 
 
   @override
   Widget build(BuildContext context) {
@@ -289,7 +443,7 @@ class QuestionNumber extends StatelessWidget {
             height: 70, 
             width: 70, 
             child: CircularProgressIndicator(
-              value: 0.3, 
+              value: progress, 
               strokeWidth: 5, 
               backgroundColor: Colors.white,
               valueColor: const AlwaysStoppedAnimation(
@@ -306,7 +460,7 @@ class QuestionNumber extends StatelessWidget {
             ),
           ),
           Text(
-            '25',
+            '$remainingTime',
             style: const TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.bold,
@@ -321,16 +475,22 @@ class QuestionNumber extends StatelessWidget {
 
 class ChoiceCard extends StatelessWidget {
   final List<dynamic> choices;  
+  final int? selectedIndex; 
+  final void Function(int index) onChoiceSelected; 
+  final bool hasAnswered; 
   
   const ChoiceCard({
     super.key, 
-    required this.choices
+    required this.choices, 
+    required this.selectedIndex, 
+    required this.onChoiceSelected, 
+    required this.hasAnswered
   }); 
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 320, 
+      height: 360, 
       width: double.infinity, 
       decoration: BoxDecoration(
         color: Colors.white, 
@@ -343,54 +503,130 @@ class ChoiceCard extends StatelessWidget {
           )
         ],
       ),
-      child: ListView.separated(
-        physics: const NeverScrollableScrollPhysics(), 
-        itemCount: choices.length, 
-        separatorBuilder: (_, __) => const SizedBox(height: 12,), 
-        itemBuilder: (context, index) {
-          return ChoiceTile(
-            text: choices[index]['choice_text'], 
-          ); 
-        }
-      )
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(choices.length, (index) {
+            // Konversi nilai DB menjadi bool murni
+            final bool isCorrect = choices[index]['is_correct'] == true;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: index == choices.length - 1 ? 0 : 12,
+              ),
+              child: ChoiceTile(
+                text: choices[index]['choice_text'],
+                isSelected: selectedIndex == index,
+                onTap: () => onChoiceSelected(index),
+                hasAnswered: hasAnswered,
+                isCorrect: isCorrect,        // jawaban ini benar menurut DB
+              ),
+            );
+          }),
+        ),
+      ),
     );
   }
 }
 
 class ChoiceTile extends StatelessWidget {
   final String text; 
+  final bool isSelected; 
+  final VoidCallback onTap; 
+  final bool hasAnswered; 
+  final bool isCorrect; 
 
   const ChoiceTile({
     super.key, 
-    required this.text
+    required this.text, 
+    required this.isSelected,
+    required this.onTap,
+    this.hasAnswered=false, 
+    this.isCorrect=false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity, 
-      height: 60, 
-      decoration: BoxDecoration(
-        color: Color.fromRGBO(118, 181, 193, 1), 
-        borderRadius: BorderRadius.circular(10) 
-      ),
-      child: Padding(
-        padding: EdgeInsetsGeometry.all(5), 
+    Color circleColor = Colors.white; 
+    Color borderColor = Color.fromRGBO(118, 181, 193, 1); 
+
+    if (hasAnswered) {
+      if (isSelected) {
+        circleColor = isCorrect ? Colors.green : Colors.red; 
+        borderColor = isCorrect ? Colors.green : Colors.red; 
+      } else if (isCorrect) {
+        circleColor = Colors.green; 
+        borderColor = Colors.green; 
+      } else {
+        circleColor = Colors.white;
+        borderColor = Color.fromRGBO(118, 181, 193, 1);
+      }
+    } else if (isSelected) {
+      // user pilih tapi belum dicek
+      circleColor = const Color.fromRGBO(118, 181, 193, 1);
+      borderColor = const Color.fromRGBO(118, 181, 193, 1);
+    }
+
+    return GestureDetector(
+      onTap: hasAnswered ? null : onTap, 
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: borderColor,
+          borderRadius: BorderRadius.circular(10),
+        ),
         child: Container(
-          width: double.infinity, 
-          height: 50, 
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: Colors.white, 
-            borderRadius: BorderRadius.circular(10) 
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
           ),
-          child: Text(text, softWrap: true, style: TextStyle(
-            fontSize: 20, 
-            fontWeight: FontWeight.w400,
-            fontFamily: "Afacad", 
-            color: Colors.black
-          ),),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    text,
+                    softWrap: true,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      height: 1.2,
+                      fontWeight: FontWeight.w400,
+                      fontFamily: "Afacad",
+                      color: Colors.black,
+                    ),
+                  ),
+                ), 
+                const SizedBox(width: 10), 
+                Container(
+                  height: 30, 
+                  width: 30, 
+                  padding: EdgeInsets.all(5),
+                  decoration: BoxDecoration(
+                    color: borderColor,
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 250), 
+                    curve: Curves.easeInOut, 
+                    width: double.infinity, 
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: circleColor,
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                  ),
+                )
+              ],
+            ),
+          ),
         ),
       ),
-    ); 
+    );
   }
 }
