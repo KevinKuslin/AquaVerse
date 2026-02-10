@@ -23,6 +23,10 @@ class _BiotaListPageState extends State<BiotaListPage> {
   final _searchCtrl = TextEditingController();
   Timer? _debounce;
 
+  // ✅ Scroll controller biar scrollbar “nempel” (wajib)
+  final ScrollController _listCtrl = ScrollController();
+  final ScrollController _chipCtrl = ScrollController();
+
   List<Map<String, dynamic>> _items = [];
   List<Map<String, dynamic>> _kategori = [];
 
@@ -43,6 +47,8 @@ class _BiotaListPageState extends State<BiotaListPage> {
   void dispose() {
     _debounce?.cancel();
     _searchCtrl.dispose();
+    _listCtrl.dispose();
+    _chipCtrl.dispose();
     super.dispose();
   }
 
@@ -81,9 +87,6 @@ class _BiotaListPageState extends State<BiotaListPage> {
     if (mounted) setState(() {});
   }
 
-  /// ✅ Query list dibuat ringan:
-  /// - jangan ambil deskripsi panjang dll
-  /// - cukup yang diperlukan untuk list
   Future<void> _loadBiota() async {
     setState(() {
       _loading = true;
@@ -110,7 +113,7 @@ class _BiotaListPageState extends State<BiotaListPage> {
       final res = await q.order('depth_meters', ascending: true).limit(300);
       _items = List<Map<String, dynamic>>.from(res);
 
-      // ✅ precache beberapa thumbnail pertama biar terasa cepat
+      // ✅ precache beberapa thumbnail pertama
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         final ctx = context;
@@ -129,10 +132,7 @@ class _BiotaListPageState extends State<BiotaListPage> {
   String _fileNameFromImagePath(dynamic imagePath) {
     final raw = (imagePath ?? '').toString().trim();
     if (raw.isEmpty) return '';
-    return raw
-        .split('/')
-        .last; // aman kalau DB berisi "clownfish.png" atau "biota/clownfish.png"
-    // kamu sekarang pakai "clownfish.png" => aman
+    return raw.split('/').last;
   }
 
   String? _thumbUrlFromRow(Map<String, dynamic> b) {
@@ -143,17 +143,13 @@ class _BiotaListPageState extends State<BiotaListPage> {
   }
 
   void _openDetail(int biotaId) {
-    // panggil dialog glass yang baru
     BiotaInfoSheet.show(context, biotaId: biotaId);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Biota Laut'),
-        // ✅ refresh dibuang (lebih clean & gak memicu spam reload)
-      ),
+      appBar: AppBar(title: const Text('Biota Laut')),
       body: SafeArea(
         child: Column(
           children: [
@@ -182,46 +178,64 @@ class _BiotaListPageState extends State<BiotaListPage> {
               ),
             ),
 
-            // Filter kategori (chip)
+            // Filter kategori (chip) + scrollbar horizontal
             SizedBox(
               height: 46,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: const Text('Semua'),
-                      selected: _selectedKategoriId == null,
-                      onSelected: (v) {
-                        setState(() => _selectedKategoriId = null);
-                        _loadBiota();
-                      },
-                    ),
-                  ),
-                  ..._kategori.map((k) {
-                    final id = k['id'] as int;
-                    final nama = (k['nama'] ?? '').toString();
-                    final selected = _selectedKategoriId == id;
-                    return Padding(
+              child: RawScrollbar(
+                controller: _chipCtrl,
+                thumbVisibility: true,
+                thickness: 5,
+                radius: const Radius.circular(999),
+                child: ListView(
+                  controller: _chipCtrl,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  children: [
+                    Padding(
                       padding: const EdgeInsets.only(right: 8),
                       child: ChoiceChip(
-                        label: Text(nama),
-                        selected: selected,
+                        label: const Text('Semua'),
+                        selected: _selectedKategoriId == null,
                         onSelected: (v) {
-                          setState(() => _selectedKategoriId = v ? id : null);
+                          setState(() => _selectedKategoriId = null);
                           _loadBiota();
                         },
                       ),
-                    );
-                  }),
-                ],
+                    ),
+                    ..._kategori.map((k) {
+                      final id = k['id'] as int;
+                      final nama = (k['nama'] ?? '').toString();
+                      final selected = _selectedKategoriId == id;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(nama),
+                          selected: selected,
+                          onSelected: (v) {
+                            setState(() => _selectedKategoriId = v ? id : null);
+                            _loadBiota();
+                          },
+                        ),
+                      );
+                    }),
+                  ],
+                ),
               ),
             ),
 
             const SizedBox(height: 8),
-            Expanded(child: _buildBody()),
+
+            // ✅ Scrollbar kanan (vertical) untuk list
+            Expanded(
+              child: RawScrollbar(
+                controller: _listCtrl,
+                thumbVisibility: true, // always show
+                thickness: 7,
+                radius: const Radius.circular(999),
+                child: _buildBody(),
+              ),
+            ),
           ],
         ),
       ),
@@ -276,6 +290,7 @@ class _BiotaListPageState extends State<BiotaListPage> {
     }
 
     return ListView.separated(
+      controller: _listCtrl, // ✅ ini yang bikin scrollbar muncul
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
       itemCount: _items.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
@@ -301,7 +316,6 @@ class _BiotaListPageState extends State<BiotaListPage> {
             ),
             child: Row(
               children: [
-                // ✅ Thumbnail: pakai biota_real (lebih relevan), tapi di-decode kecil
                 ClipRRect(
                   borderRadius: const BorderRadius.horizontal(
                     left: Radius.circular(16),
@@ -319,11 +333,8 @@ class _BiotaListPageState extends State<BiotaListPage> {
                             fit: BoxFit.cover,
                             gaplessPlayback: true,
                             filterQuality: FilterQuality.none,
-
-                            // ✅ ini yang bikin decode ringan & cepat
                             cacheWidth: 240,
                             cacheHeight: 240,
-
                             loadingBuilder: (context, child, progress) {
                               if (progress == null) return child;
                               return Container(
@@ -346,8 +357,6 @@ class _BiotaListPageState extends State<BiotaListPage> {
                           ),
                   ),
                 ),
-
-                // Text
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
@@ -389,7 +398,6 @@ class _BiotaListPageState extends State<BiotaListPage> {
                     ),
                   ),
                 ),
-
                 const Padding(
                   padding: EdgeInsets.only(right: 10),
                   child: Icon(Icons.chevron_right),
@@ -418,482 +426,6 @@ class _Pill extends StatelessWidget {
       child: Text(
         text,
         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-      ),
-    );
-  }
-}
-
-/// =======================
-/// DETAIL SHEET (POPUP BAGUS)
-/// =======================
-class _BiotaDetailSheet extends StatefulWidget {
-  final int biotaId;
-  const _BiotaDetailSheet({required this.biotaId});
-
-  @override
-  State<_BiotaDetailSheet> createState() => _BiotaDetailSheetState();
-}
-
-class _BiotaDetailSheetState extends State<_BiotaDetailSheet> {
-  static const String _bucket = 'aquaverse';
-  static const String _realFolder = 'biota_real';
-  static const String _spriteFolder = 'biota';
-
-  late Future<Map<String, dynamic>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _loadDetail();
-  }
-
-  Future<Map<String, dynamic>> _loadDetail() async {
-    final res = await supabase
-        .from('biota')
-        .select('''
-          id,
-          nama,
-          nama_latin,
-          deskripsi,
-          habitat,
-          status_konservasi,
-          fakta_unik,
-          depth_meters,
-          image_path,
-          kategori(nama)
-        ''')
-        .eq('id', widget.biotaId)
-        .single();
-
-    return Map<String, dynamic>.from(res);
-  }
-
-  String _fileName(dynamic imagePath) {
-    final raw = (imagePath ?? '').toString().trim();
-    if (raw.isEmpty) return '';
-    return raw.split('/').last;
-  }
-
-  String? _realUrl(Map<String, dynamic> b) {
-    final fn = _fileName(b['image_path']);
-    if (fn.isEmpty) return null;
-    final path = '$_realFolder/$fn';
-    return ImageUrlCache.publicUrl(bucket: _bucket, path: path);
-  }
-
-  String? _spriteUrl(Map<String, dynamic> b) {
-    final fn = _fileName(b['image_path']);
-    if (fn.isEmpty) return null;
-    final path = '$_spriteFolder/$fn';
-    return ImageUrlCache.publicUrl(bucket: _bucket, path: path);
-  }
-
-  String _meters(dynamic v) {
-    final d = double.tryParse(v.toString());
-    if (d == null) return '${v}m';
-    if (d % 1 == 0) return '${d.toInt()}m';
-    return '${d.toStringAsFixed(1)}m';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return _SheetShell(
-      child: FutureBuilder<Map<String, dynamic>>(
-        future: _future,
-        builder: (context, snap) {
-          if (snap.connectionState != ConnectionState.done) {
-            return const Padding(
-              padding: EdgeInsets.all(22),
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          if (snap.hasError) {
-            return Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SizedBox(height: 8),
-                  const Text(
-                    'Gagal memuat detail',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(snap.error.toString(), textAlign: TextAlign.center),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Tutup'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () =>
-                              setState(() => _future = _loadDetail()),
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Coba lagi'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final b = snap.data!;
-
-          final nama = (b['nama'] ?? '-').toString();
-          final latin = (b['nama_latin'] ?? '').toString();
-          final deskripsi = (b['deskripsi'] ?? '').toString();
-          final habitat = (b['habitat'] ?? '').toString();
-          final status = (b['status_konservasi'] ?? '').toString();
-          final fakta = (b['fakta_unik'] ?? '').toString();
-          final kategoriNama = (b['kategori']?['nama'] ?? '').toString();
-          final depth = b['depth_meters'];
-          final depthText = depth == null ? '-' : _meters(depth);
-
-          final realUrl = _realUrl(b);
-          final spriteUrl = _spriteUrl(b);
-
-          return DraggableScrollableSheet(
-            expand: false,
-            initialChildSize: 0.72,
-            minChildSize: 0.45,
-            maxChildSize: 0.95,
-            builder: (context, scrollCtrl) {
-              return SingleChildScrollView(
-                controller: scrollCtrl,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 46,
-                          height: 5,
-                          margin: const EdgeInsets.only(bottom: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                        ),
-                      ),
-
-                      // FOTO REAL (fallback ke sprite)
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(18),
-                        child: AspectRatio(
-                          aspectRatio: 16 / 9,
-                          child: _SmartImage(
-                            primaryUrl: realUrl,
-                            fallbackUrl: spriteUrl,
-                          ),
-                        ),
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  nama,
-                                  style: const TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                                ),
-                                if (latin.isNotEmpty) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    latin,
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontStyle: FontStyle.italic,
-                                      color: Colors.black.withOpacity(0.6),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            onPressed: () => Navigator.pop(context),
-                            icon: const Icon(Icons.close),
-                            tooltip: 'Tutup',
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _ChipPill(icon: Icons.waves, label: depthText),
-                          if (kategoriNama.isNotEmpty)
-                            _ChipPill(
-                              icon: Icons.category_rounded,
-                              label: kategoriNama,
-                            ),
-                          if (status.isNotEmpty)
-                            _ChipPill(
-                              icon: Icons.shield_rounded,
-                              label: status,
-                            ),
-                          if (habitat.isNotEmpty)
-                            _ChipPill(
-                              icon: Icons.place_rounded,
-                              label: habitat,
-                            ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 12),
-
-                      _SectionCard(
-                        title: 'Deskripsi',
-                        icon: Icons.menu_book_rounded,
-                        child: Text(
-                          deskripsi.isEmpty
-                              ? 'Belum ada deskripsi.'
-                              : deskripsi,
-                          style: const TextStyle(fontSize: 14, height: 1.4),
-                        ),
-                      ),
-
-                      if (fakta.isNotEmpty) ...[
-                        const SizedBox(height: 10),
-                        _SectionCard(
-                          title: 'Fakta unik',
-                          icon: Icons.auto_awesome_rounded,
-                          child: Text(
-                            fakta,
-                            style: const TextStyle(fontSize: 14, height: 1.4),
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => Navigator.pop(context),
-                              icon: const Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                              ),
-                              label: const Text('Tutup'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-/// Image yang coba primary dulu (real), kalau error -> fallback (sprite)
-class _SmartImage extends StatefulWidget {
-  final String? primaryUrl;
-  final String? fallbackUrl;
-
-  const _SmartImage({required this.primaryUrl, required this.fallbackUrl});
-
-  @override
-  State<_SmartImage> createState() => _SmartImageState();
-}
-
-class _SmartImageState extends State<_SmartImage> {
-  bool _useFallback = false;
-
-  @override
-  void didUpdateWidget(covariant _SmartImage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.primaryUrl != widget.primaryUrl ||
-        oldWidget.fallbackUrl != widget.fallbackUrl) {
-      _useFallback = false;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final url = _useFallback ? widget.fallbackUrl : widget.primaryUrl;
-
-    if (url == null) {
-      return Container(
-        color: Colors.black.withOpacity(0.06),
-        child: const Center(child: Icon(Icons.image, size: 30)),
-      );
-    }
-
-    return Image.network(
-      url,
-      fit: BoxFit.cover,
-      gaplessPlayback: true,
-      filterQuality: FilterQuality.medium,
-
-      // ✅ decode sesuai ukuran area sheet (biar ga berat)
-      cacheWidth: 720,
-
-      loadingBuilder: (context, child, progress) {
-        if (progress == null) return child;
-        return Container(
-          color: Colors.black.withOpacity(0.06),
-          child: const Center(
-            child: SizedBox(
-              width: 18,
-              height: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-          ),
-        );
-      },
-      errorBuilder: (_, __, ___) {
-        if (!_useFallback && widget.fallbackUrl != null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) setState(() => _useFallback = true);
-          });
-          return Container(
-            color: Colors.black.withOpacity(0.06),
-            child: const Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          );
-        }
-        return Container(
-          color: Colors.black.withOpacity(0.06),
-          child: const Center(child: Icon(Icons.broken_image)),
-        );
-      },
-    );
-  }
-}
-
-class _SheetShell extends StatelessWidget {
-  final Widget child;
-  const _SheetShell({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
-
-    return SafeArea(
-      child: Padding(
-        padding: EdgeInsets.only(bottom: bottom),
-        child: Container(
-          margin: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.96),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: Colors.black.withOpacity(0.08)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.12),
-                blurRadius: 18,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Widget child;
-
-  const _SectionCard({
-    required this.title,
-    required this.icon,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.black.withOpacity(0.06)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 18),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _ChipPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _ChipPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.black.withOpacity(0.08)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
-          ),
-        ],
       ),
     );
   }

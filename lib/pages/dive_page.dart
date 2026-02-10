@@ -257,12 +257,15 @@ class _DivePageState extends State<DivePage> with TickerProviderStateMixin {
   }
 
   void _onDragUpdate(DragUpdateDetails d) {
-    final newDepth = (_depth - d.delta.dy * dragSensitivity / pxPerMeter).clamp(
-      0.0,
-      _maxDepth,
-    );
-    if ((newDepth - _depth).abs() < 0.1) return;
-    setState(() => _depth = newDepth);
+    // Kurangi sedikit sensitivitas jika terasa terlalu liar
+    final deltaDepth = (d.delta.dy * dragSensitivity) / pxPerMeter;
+    final newDepth = (_depth - deltaDepth).clamp(0.0, _maxDepth);
+
+    // Hapus pengecekan (newDepth - _depth).abs() < 0.1
+    // agar pergerakan selalu smooth dan responsif
+    if (newDepth != _depth) {
+      setState(() => _depth = newDepth);
+    }
   }
 
   Map<String, dynamic>? _rowById(int id) {
@@ -462,6 +465,13 @@ class _DivePageState extends State<DivePage> with TickerProviderStateMixin {
                       maxDepth: _maxDepth,
                       onBack: () => Navigator.pop(context),
                     ),
+                    _DepthScroller(
+                      depth: _depth,
+                      maxDepth: _maxDepth,
+                      onChanged: (newDepth) {
+                        setState(() => _depth = newDepth);
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -548,27 +558,28 @@ class _SwimLayer extends StatelessWidget {
       final opacity = (opacityBase * fade).clamp(0.0, 1.0);
 
       children.add(
-        Positioned(
-          key: ValueKey(v.id),
-          left: s.x - v.fishW / 2,
-          top: v.top,
-          child: Opacity(
-            opacity: opacity,
-            child: GestureDetector(
-              onTap: () => onSelect(v.row),
-              child: FishSprite(
-                storagePath: s.storagePath,
-                bucket: _DivePageState.bucketName,
-                updatedAt: s.updatedAt,
-                width: v.fishW,
-                height: v.fishH,
-                duration: s.spriteDuration,
-                flipX: s.vx > 0,
-              ),
+      Positioned(
+        key: ValueKey('fish_${v.id}'), // Gunakan ID unik dari DB agar widget tidak rebuild sia-sia
+        left: s.x - v.fishW / 2,
+        top: v.top,
+        child: Opacity(
+          opacity: opacity,
+          child: GestureDetector(
+            onTap: () => onSelect(v.row),
+            child: FishSprite(
+              storagePath: s.storagePath,
+              bucket: _DivePageState.bucketName,
+              updatedAt: s.updatedAt, // PASTIKAN INI ADA
+              width: v.fishW,
+              height: v.fishH,
+              duration: s.spriteDuration,
+              flipX: s.vx > 0,
+              animate: true, // Biar ikannya gerak
             ),
           ),
         ),
-      );
+      ),
+    );
     }
 
     return Stack(children: children);
@@ -961,6 +972,115 @@ class _DiveHud extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DepthScroller extends StatelessWidget {
+  final double depth;
+  final double maxDepth;
+  final ValueChanged<double> onChanged;
+
+  const _DepthScroller({
+    required this.depth,
+    required this.maxDepth,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    // Tinggi track scrollbar (misal 60% dari tinggi layar)
+    final scrollTrackHeight = size.height * 0.6;
+    final topOffset = size.height * 0.2; // Jarak dari atas
+
+    // Hitung posisi kotak berdasarkan persentase depth
+    final pct = (depth / maxDepth).clamp(0.0, 1.0);
+    final knobPos = topOffset + (pct * scrollTrackHeight);
+
+    return Positioned(
+      right: 0,
+      top: 0,
+      bottom: 0,
+      width: 80, // Area sensitif sentuhan di kanan
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onVerticalDragUpdate: (details) {
+          // Logika scrollbar biasa: posisi sentuhan menentukan nilai
+          final localY = details.localPosition.dy - topOffset;
+          final newPct = (localY / scrollTrackHeight).clamp(0.0, 1.0);
+          onChanged(newPct * maxDepth);
+        },
+        child: Stack(
+          children: [
+            // Track Line (Garis tipis scrollbar)
+            Positioned(
+              right: 15,
+              top: topOffset,
+              height: scrollTrackHeight,
+              width: 2,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(1),
+                ),
+              ),
+            ),
+
+            // Knob / Kotak Angka
+            Positioned(
+              right: 10,
+              top: knobPos - 20, // 20 adalah setengah tinggi kotak agar center
+              child: _GlassDepthKnob(depth: depth),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassDepthKnob extends StatelessWidget {
+  final double depth;
+  const _GlassDepthKnob({required this.depth});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          width: 50,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.white.withOpacity(0.3)),
+          ),
+          alignment: Alignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                depth.toStringAsFixed(0),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                'm',
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

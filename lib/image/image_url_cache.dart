@@ -5,8 +5,16 @@ class ImageUrlCache {
 
   static final Map<String, String> _cache = {};
 
-  static String publicUrl({required String bucket, required String path}) {
-    final key = '$bucket|$path';
+  static String publicUrl({
+    required String bucket,
+    required String path,
+    DateTime? updatedAt,
+  }) {
+    // Key sekarang menyertakan timestamp agar unik jika file diperbarui
+    final key = updatedAt != null
+        ? '$bucket|$path|${updatedAt.millisecondsSinceEpoch}'
+        : '$bucket|$path';
+
     return _cache.putIfAbsent(
       key,
       () => Supabase.instance.client.storage.from(bucket).getPublicUrl(path),

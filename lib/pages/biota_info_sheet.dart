@@ -13,7 +13,6 @@ String _withVersion(String url, DateTime? updatedAt) {
   return '$url${join}v=$v';
 }
 
-
 class BiotaInfoSheet {
   static Future<void> show(BuildContext context, {required int biotaId}) {
     return showGeneralDialog(
@@ -66,7 +65,8 @@ class _BiotaInfoDialogState extends State<_BiotaInfoDialog> {
       final res = await supabase
           .from('biota')
           .select(
-              'id,nama,nama_latin,deskripsi,habitat,status_konservasi,fakta_unik,depth_meters,image_path,updated_at')
+            'id,nama,nama_latin,deskripsi,habitat,status_konservasi,fakta_unik,depth_meters,image_path,updated_at',
+          )
           .eq('id', widget.biotaId)
           .maybeSingle();
 
@@ -88,7 +88,11 @@ class _BiotaInfoDialogState extends State<_BiotaInfoDialog> {
   }
 
   String? _realImageUrl(Map<String, dynamic> row) {
-    final filename = (row['image_path'] ?? '').toString().trim().split('/').last;
+    final filename = (row['image_path'] ?? '')
+        .toString()
+        .trim()
+        .split('/')
+        .last;
     if (filename.isEmpty) return null;
 
     final updatedAt = _parseUpdatedAt(row['updated_at']);
@@ -136,14 +140,14 @@ class _BiotaInfoDialogState extends State<_BiotaInfoDialog> {
                           child: _LoadingView(),
                         )
                       : (_error != null)
-                          ? Padding(
-                              padding: const EdgeInsets.all(18),
-                              child: _ErrorBox(
-                                error: _error!,
-                                onClose: () => Navigator.pop(context),
-                              ),
-                            )
-                          : _Content(row: _row!, imageUrl: _realImageUrl(_row!) ),
+                      ? Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: _ErrorBox(
+                            error: _error!,
+                            onClose: () => Navigator.pop(context),
+                          ),
+                        )
+                      : _Content(row: _row!, imageUrl: _realImageUrl(_row!)),
                 ),
               ),
             ),
@@ -259,7 +263,8 @@ class _Content extends StatelessWidget {
                         label: 'Depth',
                         value: '${depth.toStringAsFixed(0)} m',
                       ),
-                    if (depth != null && status.isNotEmpty) const SizedBox(width: 8),
+                    if (depth != null && status.isNotEmpty)
+                      const SizedBox(width: 8),
                     if (status.isNotEmpty)
                       _StatPill(
                         icon: Icons.verified,
@@ -271,7 +276,6 @@ class _Content extends StatelessWidget {
               ),
             ),
           ],
-
 
           const SizedBox(height: 12),
 
@@ -304,7 +308,10 @@ class _Content extends StatelessWidget {
                       padding: const EdgeInsets.only(top: 10),
                       child: Text(
                         'Belum ada informasi tambahan untuk biota ini.',
-                        style: TextStyle(color: Colors.white.withOpacity(0.80), decoration: TextDecoration.none),
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.80),
+                          decoration: TextDecoration.none,
+                        ),
                       ),
                     ),
                 ],
@@ -398,40 +405,6 @@ class _Section extends StatelessWidget {
   }
 }
 
-class _Pill extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  const _Pill({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: Colors.white.withOpacity(0.9)),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              decoration: TextDecoration.none,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _StatPill extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -485,7 +458,6 @@ class _StatPill extends StatelessWidget {
   }
 }
 
-
 class _LoadingView extends StatelessWidget {
   const _LoadingView();
 
@@ -501,7 +473,11 @@ class _LoadingView extends StatelessWidget {
         const SizedBox(height: 12),
         Text(
           'Memuat informasi...',
-          style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 14,  decoration: TextDecoration.none),
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.85),
+            fontSize: 14,
+            decoration: TextDecoration.none,
+          ),
         ),
       ],
     );
@@ -523,7 +499,10 @@ class _ErrorBox extends StatelessWidget {
         Text(
           error,
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white.withOpacity(0.90), decoration: TextDecoration.none),
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.90),
+            decoration: TextDecoration.none,
+          ),
         ),
         const SizedBox(height: 12),
         SizedBox(

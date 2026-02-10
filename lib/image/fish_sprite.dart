@@ -1,27 +1,15 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'image_url_cache.dart';
 
 class FishSprite extends StatefulWidget {
-  /// Dari DB: "clownfish.png" / atau "biota/clownfish.png"
   final String storagePath;
-
-  /// Cache-busting (ambil dari updated_at kolom biota)
   final DateTime? updatedAt;
-
-  /// Bucket supabase storage
   final String bucket;
-
-  /// Ukuran window (1 frame)
   final double width;
   final double height;
-
-  /// Durasi loop 4 frame (2x2)
   final Duration duration;
-
-  /// Mirror horizontal
   final bool flipX;
-
-  /// Kalau false, hanya frame 0
   final bool animate;
 
   const FishSprite({
@@ -54,15 +42,11 @@ class _FishSpriteState extends State<FishSprite> with TickerProviderStateMixin {
   @override
   void didUpdateWidget(covariant FishSprite oldWidget) {
     super.didUpdateWidget(oldWidget);
-
-    // URL berubah kalau path/bucket/updatedAt berubah
     if (oldWidget.storagePath != widget.storagePath ||
         oldWidget.bucket != widget.bucket ||
         oldWidget.updatedAt != widget.updatedAt) {
       _buildUrl();
     }
-
-    // Controller berubah kalau animate/duration berubah
     if (oldWidget.animate != widget.animate ||
         oldWidget.duration != widget.duration) {
       _syncController();
@@ -76,50 +60,28 @@ class _FishSpriteState extends State<FishSprite> with TickerProviderStateMixin {
   }
 
   void _syncController() {
-    // selalu dispose dulu sebelum bikin baru
-    _controller?.stop();
     _controller?.dispose();
     _controller = null;
-
     if (!widget.animate) return;
-
     _controller = AnimationController(vsync: this, duration: widget.duration)
       ..repeat();
   }
 
-  String _normalizePath(String raw) {
-    final p = raw.trim();
-    if (p.isEmpty) return '';
-    if (!p.contains('/')) return 'biota/$p';
-    return p;
-  }
-
-  String _withVersion(String url) {
-    final v = widget.updatedAt?.millisecondsSinceEpoch;
-    if (v == null) return url;
-    final join = url.contains('?') ? '&' : '?';
-    return '$url${join}v=$v';
-  }
-
   void _buildUrl() {
-    final spritePath = _normalizePath(widget.storagePath);
+    final p = widget.storagePath.trim();
+    final spritePath = p.contains('/') ? p : 'biota/$p';
+    
     if (spritePath.isEmpty) {
       _url = '';
       return;
     }
 
-    final baseUrl = ImageUrlCache.publicUrl(
+    // Pakai cache URL yang sudah kita buat tadi
+    _url = ImageUrlCache.publicUrl(
       bucket: widget.bucket,
       path: spritePath,
+      updatedAt: widget.updatedAt,
     );
-
-    _url = _withVersion(baseUrl);
-
-    // precache biar muncul cepat
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _url.isEmpty) return;
-      precacheImage(NetworkImage(_url), context);
-    });
   }
 
   int _currentFrame() {
@@ -130,60 +92,50 @@ class _FishSpriteState extends State<FishSprite> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     if (_url.isEmpty) {
-      return SizedBox(
-        width: widget.width,
-        height: widget.height,
-        child: const Center(child: Icon(Icons.image, size: 18)),
-      );
+      return SizedBox(width: widget.width, height: widget.height);
     }
 
-    final child = SizedBox(
-      width: widget.width,
-      height: widget.height,
-      child: ClipRect(
-        child: (widget.animate && _controller != null)
-            ? AnimatedBuilder(
-                animation: _controller!,
-                builder: (_, __) => _buildFrame(_currentFrame()),
-              )
-            : _buildFrame(0),
-      ),
+    final spriteContent = Stack(
+      children: [
+        Positioned(
+          // Logic frame 2x2 tetap sama
+          left: (_currentFrame() == 1 || _currentFrame() == 3) ? -widget.width : 0.0,
+          top: (_currentFrame() == 2 || _currentFrame() == 3) ? -widget.height : 0.0,
+          width: widget.width * 2,
+          height: widget.height * 2,
+          child: CachedNetworkImage(
+            imageUrl: _url,
+            fit: BoxFit.fill,
+            filterQuality: FilterQuality.none, // Pixel art look
+            
+            // --- OPTIMASI RAM ---
+            // Karena sheet-nya 2x2, cache-nya 2x lipat ukuran frame
+            memCacheWidth: (widget.width * 2).round(),
+            memCacheHeight: (widget.height * 2).round(),
+            
+            // --- OPTIMASI LOADING ---
+            placeholder: (context, url) => const SizedBox.shrink(),
+            errorWidget: (context, url, error) => const Icon(Icons.broken_image, color: Colors.white24),
+          ),
+        ),
+      ],
     );
 
     return Transform(
       alignment: Alignment.center,
       transform: Matrix4.identity()..scale(widget.flipX ? -1.0 : 1.0, 1.0),
-      child: child,
-    );
-  }
-
-  Widget _buildFrame(int frame) {
-    // 2x2 sheet: frame 0..3
-    final xPos = (frame == 1 || frame == 3) ? -widget.width : 0.0;
-    final yPos = (frame == 2 || frame == 3) ? -widget.height : 0.0;
-
-    return Stack(
-      children: [
-        Positioned(
-          left: xPos,
-          top: yPos,
-          width: widget.width * 2,
-          height: widget.height * 2,
-          child: Image.network(
-            _url,
-            fit: BoxFit.fill,
-            gaplessPlayback: true,
-            filterQuality: FilterQuality.none,
-
-            // decode lebih ringan
-            cacheWidth: (widget.width * 2).round(),
-            cacheHeight: (widget.height * 2).round(),
-
-            errorBuilder: (_, __, ___) =>
-                const Center(child: Icon(Icons.broken_image)),
-          ),
+      child: SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: ClipRect(
+          child: widget.animate 
+            ? AnimatedBuilder(
+                animation: _controller!,
+                builder: (_, __) => spriteContent,
+              )
+            : spriteContent,
         ),
-      ],
+      ),
     );
   }
 }
