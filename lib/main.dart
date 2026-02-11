@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false, 
-      home: const QuizPage()
+      home: const SplashScreen()
     ); 
   }
 }

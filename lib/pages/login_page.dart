@@ -118,7 +118,7 @@ class _LoginPageState extends State<LoginPage> {
           ClipPath(
             clipper: WaveClipper(), 
             child: Container(
-              height: 280,
+              height: 240,
               decoration: BoxDecoration(
                 image: DecorationImage(
                   image: NetworkImage(backgroundHomeUrl), 
@@ -144,7 +144,7 @@ class _LoginPageState extends State<LoginPage> {
           Align(
             alignment: Alignment.bottomCenter, 
             child: Container(
-              height: 550, 
+              height: 570, 
               width: double.infinity,
               color: Colors.white, 
               child: Padding(
