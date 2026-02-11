@@ -8,6 +8,7 @@ import 'dart:collection';
 import '../image/fish_sprite.dart';
 import '../image/image_url_cache.dart';
 import 'biota_info_sheet.dart';
+import 'biota_list_page.dart'; // Pastikan import ini ada untuk navigasi logbook
 
 final supabase = Supabase.instance.client;
 
@@ -121,7 +122,7 @@ class _DivePageState extends State<DivePage> with TickerProviderStateMixin {
     try {
       final res = await supabase
           .from('biota')
-          .select('id,nama,depth_meters,image_path,updated_at')
+          .select('id,nama,depth_meters,image_path,updated_at, size_scale')
           .order('depth_meters', ascending: true)
           .limit(800);
 
@@ -184,10 +185,11 @@ class _DivePageState extends State<DivePage> with TickerProviderStateMixin {
         final jitter = (rnd.nextDouble() - 0.5) * step * 0.22;
         s.x = ((i + 1) * step + jitter).clamp(0.0, w);
 
-        if (rnd.nextBool())
+        if (rnd.nextBool()) {
           s.vx = s.vx.abs();
-        else
+        } else {
           s.vx = -s.vx.abs();
+        }
       }
     }
 
@@ -207,8 +209,9 @@ class _DivePageState extends State<DivePage> with TickerProviderStateMixin {
         final b = _swimmersById[ids[i + 1]]!;
 
         final base = 110.0;
-        final aw = base * a.scale;
-        final bw = base * b.scale;
+        final aw = base * a.sizeScale;
+        final bw = base * b.sizeScale;
+
         final minGap = (aw + bw) * 0.5 * minGapFactor;
 
         final dx = b.x - a.x;
@@ -257,12 +260,8 @@ class _DivePageState extends State<DivePage> with TickerProviderStateMixin {
   }
 
   void _onDragUpdate(DragUpdateDetails d) {
-    // Kurangi sedikit sensitivitas jika terasa terlalu liar
     final deltaDepth = (d.delta.dy * dragSensitivity) / pxPerMeter;
     final newDepth = (_depth - deltaDepth).clamp(0.0, _maxDepth);
-
-    // Hapus pengecekan (newDepth - _depth).abs() < 0.1
-    // agar pergerakan selalu smooth dan responsif
     if (newDepth != _depth) {
       setState(() => _depth = newDepth);
     }
@@ -281,8 +280,8 @@ class _DivePageState extends State<DivePage> with TickerProviderStateMixin {
     final anchorY =
         (swimmer.depthMeters - _depth) * pxPerMeter + size.height * 0.18;
 
-    final base = isLandscape ? 125.0 : 110.0;
-    final fishW = base * swimmer.scale;
+    final base = isLandscape ? 105.0 : 90.0;
+    final fishW = base * swimmer.sizeScale;
     final fishH = fishW * 0.70;
 
     final left = swimmer.x - fishW / 2;
@@ -386,10 +385,17 @@ class _DivePageState extends State<DivePage> with TickerProviderStateMixin {
     });
   }
 
+  String _getZoneName(double depth) {
+    if (depth < 200) return "Sunlight Zone";
+    if (depth < 1000) return "Twilight Zone";
+    return "Midnight Zone";
+  }
+
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final isLandscape = size.width > size.height;
+    final sunOpacity = (1.0 - (_depth / 150)).clamp(0.0, 0.3);
 
     return Scaffold(
       body: SafeArea(
@@ -407,6 +413,34 @@ class _DivePageState extends State<DivePage> with TickerProviderStateMixin {
                       child: RepaintBoundary(
                         child: _OceanBackground(depth: _depth),
                       ),
+                    ),
+
+                    // God Rays (Efek cahaya matahari di atas)
+                    if (_depth < 150)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Opacity(
+                            opacity: sunOpacity,
+                            child: Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                  colors: [
+                                    Colors.white54,
+                                    Colors.transparent,
+                                    Colors.transparent,
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // Bubble Effect
+                    const Positioned.fill(
+                      child: IgnorePointer(child: BubbleEffect()),
                     ),
 
                     AnimatedBuilder(
@@ -465,12 +499,54 @@ class _DivePageState extends State<DivePage> with TickerProviderStateMixin {
                       maxDepth: _maxDepth,
                       onBack: () => Navigator.pop(context),
                     ),
+
+                    // Info Zona Laut
+                    Positioned(
+                      left: 20,
+                      top: 80,
+                      child: IgnorePointer(
+                        child: Text(
+                          _getZoneName(_depth),
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.6),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Scrollbar Kustom
                     _DepthScroller(
                       depth: _depth,
                       maxDepth: _maxDepth,
                       onChanged: (newDepth) {
                         setState(() => _depth = newDepth);
                       },
+                    ),
+
+                    // Tombol ke Logbook (BiotaListPage)
+                    Positioned(
+                      bottom: 30,
+                      left: 20,
+                      child: FloatingActionButton.extended(
+                        heroTag: 'dive_to_logbook',
+                        backgroundColor: Colors.white.withOpacity(0.15),
+                        label: const Text(
+                          "Logbook",
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        icon: const Icon(Icons.menu_book, color: Colors.white),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const BiotaListPage(),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -505,7 +581,7 @@ class _SwimLayer extends StatelessWidget {
       if (id != null) byId[id] = b;
     }
 
-    const extra = 220.0;
+    const viewportPadding = 300.0;
     final base = isLandscape ? 125.0 : 110.0;
 
     final visible = <_VisibleFish>[];
@@ -518,7 +594,7 @@ class _SwimLayer extends StatelessWidget {
       if (row == null) continue;
       if (s.storagePath.isEmpty) continue;
 
-      final fishW = base * s.scale;
+      final fishW = base * s.sizeScale;
       final fishH = fishW * 0.70;
 
       final anchorY =
@@ -526,7 +602,7 @@ class _SwimLayer extends StatelessWidget {
           size.height * 0.18;
       final y = anchorY + s.yOffset - fishH / 2;
 
-      if (y < -extra || y > size.height + extra) continue;
+      if (y < -viewportPadding || y > size.height + viewportPadding) continue;
 
       visible.add(
         _VisibleFish(
@@ -540,49 +616,45 @@ class _SwimLayer extends StatelessWidget {
       );
     }
 
-    visible.sort((a, b) => a.top.compareTo(b.top));
+    visible.sort((a, b) => a.swimmer.scale.compareTo(b.swimmer.scale));
 
-    final children = <Widget>[];
-    for (final v in visible) {
-      final s = v.swimmer;
+    return Stack(
+      children: visible.map((v) {
+        final s = v.swimmer;
+        final opacityBase = 1.0;
 
-      final opacityBase = (0.55 + 0.45 * (1 / s.z)).clamp(0.45, 1.0);
+        double fade = 1.0;
+        const fadeDist = 90.0;
+        if (v.top < 0) fade = (1 - (-v.top / fadeDist)).clamp(0.0, 1.0);
+        if (v.top > size.height - v.fishH) {
+          final over = v.top - (size.height - v.fishH);
+          fade = (1 - (over / fadeDist)).clamp(0.0, 1.0);
+        }
+        final opacity = (opacityBase * fade).clamp(0.0, 1.0).toDouble();
 
-      double fade = 1.0;
-      const fadeDist = 90.0;
-      if (v.top < 0) fade = (1 - (-v.top / fadeDist)).clamp(0.0, 1.0);
-      if (v.top > size.height - v.fishH) {
-        final over = v.top - (size.height - v.fishH);
-        fade = (1 - (over / fadeDist)).clamp(0.0, 1.0);
-      }
-      final opacity = (opacityBase * fade).clamp(0.0, 1.0);
-
-      children.add(
-      Positioned(
-        key: ValueKey('fish_${v.id}'), // Gunakan ID unik dari DB agar widget tidak rebuild sia-sia
-        left: s.x - v.fishW / 2,
-        top: v.top,
-        child: Opacity(
-          opacity: opacity,
-          child: GestureDetector(
-            onTap: () => onSelect(v.row),
-            child: FishSprite(
-              storagePath: s.storagePath,
-              bucket: _DivePageState.bucketName,
-              updatedAt: s.updatedAt, // PASTIKAN INI ADA
-              width: v.fishW,
-              height: v.fishH,
-              duration: s.spriteDuration,
-              flipX: s.vx > 0,
-              animate: true, // Biar ikannya gerak
+        return Positioned(
+          key: ValueKey('fish_${v.id}'),
+          left: s.x - v.fishW / 2,
+          top: v.top,
+          child: Opacity(
+            opacity: opacity,
+            child: GestureDetector(
+              onTap: () => onSelect(v.row),
+              child: FishSprite(
+                storagePath: s.storagePath,
+                bucket: _DivePageState.bucketName,
+                updatedAt: s.updatedAt,
+                width: v.fishW,
+                height: v.fishH,
+                duration: s.spriteDuration,
+                flipX: s.vx > 0,
+                animate: true,
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      }).toList(),
     );
-    }
-
-    return Stack(children: children);
   }
 }
 
@@ -610,6 +682,9 @@ class _Swimmer {
   double depthMeters;
   DateTime? updatedAt;
 
+  // ✅ ukuran manual dari DB
+  final double sizeScale;
+
   int band = 0;
 
   double x;
@@ -630,6 +705,7 @@ class _Swimmer {
     required this.storagePath,
     required this.depthMeters,
     required this.updatedAt,
+    required this.sizeScale, // ✅
     required this.x,
     required this.yOffset,
     required this.vx,
@@ -651,13 +727,62 @@ class _Swimmer {
     final filename = raw.split('/').last;
     final path = filename.isEmpty ? '' : 'biota/$filename';
 
-    final z = 1.0 + rnd.nextDouble() * 1.4;
-    final scale = (1 / z).clamp(0.42, 1.0);
+    // === SIZE SCALE PROPORSIONAL (untuk semua biota) ===
+    // Ambil dari DB. Anggap ini "rating ukuran" (bebas kamu isi).
+    // Kita dukung 2 skenario umum:
+    // - kalau kamu isi 0..1 (float), langsung dipakai sebagai ratio
+    // - kalau kamu isi 1..5 / 1..10 (int), kita normalize ke 0..1
+    final rawDb = (b['size_scale'] as num?)?.toDouble();
 
-    final baseSpeed = 18 + rnd.nextDouble() * 26;
-    final vx = (rnd.nextBool() ? 1 : -1) * baseSpeed * scale;
+    double t;
+    if (rawDb == null) {
+      t = 0.5; // default tengah
+    } else if (rawDb <= 1.2) {
+      // asumsi sudah 0..1-ish
+      t = rawDb.clamp(0.0, 1.0);
+    } else if (rawDb <= 5.0) {
+      // asumsi 1..5
+      t = ((rawDb - 1.0) / 4.0).clamp(0.0, 1.0);
+    } else if (rawDb <= 10.0) {
+      // asumsi 1..10
+      t = ((rawDb - 1.0) / 9.0).clamp(0.0, 1.0);
+    } else {
+      // kalau ada yang aneh (mis. 50), clamp aja biar aman
+      t = 1.0;
+    }
 
-    final bobAmp = (5 + rnd.nextDouble() * 12) * scale;
+    // Map t (0..1) ke skala aman. Ini bikin semua biota "berbeda",
+    // tapi ga ada yang kegedean / kekecilan ekstrem.
+    // Kamu bisa tweak range ini:
+    // const minSize = 0.82;
+    // const maxSize = 1.18;
+    // ambil score dari DB (2..10)
+    final sizeScore = (b['size_scale'] as num?)?.toDouble() ?? 5.0;
+
+    // clamp biar aman kalau ada data nyasar
+    final s = sizeScore.clamp(1.0, 10.0);
+
+    // map 1..10 -> 0.70..1.35 (aman, beda terasa)
+    double mappedScale(double v) {
+      // normalize 1..10 => 0..1
+      final t = (v - 1.0) / 9.0;
+      // ease biar kecil gak kegedean, gede gak ekstrem
+      final eased = t * t * (3 - 2 * t); // smoothstep
+      return 0.55 + (1.35 - 0.55) * eased;
+    }
+
+    final sizeScale = mappedScale(s);
+
+    // === z dimatiin biar gak ada efek jauh-dekat aneh ===
+    final z = 1.0;
+    final scale = 1.0; // base scale tetap 1 (biar gak dobel efek)
+
+    // speed tidak tergantung ukuran biar semua enak
+    final baseSpeed = 22 + rnd.nextDouble() * 22;
+    final vx = (rnd.nextBool() ? 1 : -1) * baseSpeed;
+
+    // bobbing tetap hidup, amp bisa sedikit ikut sizeScale biar natural
+    final bobAmp = (5 + rnd.nextDouble() * 12) * (0.85 + 0.3 * t);
     final bobSpeed = 1.2 + rnd.nextDouble() * 1.8;
     final bobPhase = rnd.nextDouble() * math.pi * 2;
 
@@ -668,6 +793,7 @@ class _Swimmer {
       storagePath: path,
       depthMeters: depth,
       updatedAt: updatedAt,
+      sizeScale: sizeScale,
       x: 0,
       yOffset: 0,
       vx: vx,
@@ -936,11 +1062,6 @@ class _DiveHud extends StatelessWidget {
       top: 10,
       child: Row(
         children: [
-          IconButton(
-            onPressed: onBack,
-            icon: const Icon(Icons.arrow_back),
-            color: Colors.white,
-          ),
           const SizedBox(width: 10),
           Expanded(
             child: ClipRRect(
@@ -1116,7 +1237,61 @@ class _OceanBackground extends StatelessWidget {
   }
 }
 
-/// === PREVIEW CARD (biota_real) — SEKARANG CENTER ===
+class BubbleEffect extends StatefulWidget {
+  const BubbleEffect({super.key});
+  @override
+  State<BubbleEffect> createState() => _BubbleEffectState();
+}
+
+class _BubbleEffectState extends State<BubbleEffect>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _ctrl;
+  final List<math.Point> _bubbles = List.generate(
+    20,
+    (_) => math.Point(math.Random().nextDouble(), math.Random().nextDouble()),
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.sizeOf(context);
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => Stack(
+        children: _bubbles.map((p) {
+          final y = ((p.y - _ctrl.value) * size.height) % size.height;
+          return Positioned(
+            left: p.x * size.width,
+            top: y,
+            child: Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
 class _BiotaRealOverlaySheet extends StatelessWidget {
   final String bucketName;
   final Map<String, dynamic> row;
