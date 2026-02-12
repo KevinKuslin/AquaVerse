@@ -145,7 +145,11 @@ class _LoginPageState extends State<LoginPage> {
             left: 0,
             right: 0,
             child: Container(
+<<<<<<< HEAD
               height: 550,
+=======
+              height: 570, 
+>>>>>>> 06a5c6550c25d32493f877f04edfcf69ba64f77e
               width: double.infinity,
               color: Colors.white,
               child: Padding(
