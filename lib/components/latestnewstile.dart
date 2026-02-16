@@ -15,7 +15,7 @@ class LatestNewsTile extends StatelessWidget {
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
-          BoxShadow(color: Colors.grey.withOpacity(0.2), blurRadius: 5, offset: Offset(0, 3))
+          BoxShadow(color: Colors.grey.withValues(alpha: 0.2), blurRadius: 5, offset: Offset(0, 3))
         ]
       ),
       child: Column(
@@ -30,7 +30,7 @@ class LatestNewsTile extends StatelessWidget {
               width: double.infinity,
               fit: BoxFit.cover,
               placeholder: (context, url) => Container(
-                height: 130,
+                height: 120,
                 color: Colors.grey[200],
                 child: Center(
                   child: CircularProgressIndicator(
@@ -56,7 +56,7 @@ class LatestNewsTile extends StatelessWidget {
           
           // BAGIAN TEXT & AUTHOR
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -64,9 +64,9 @@ class LatestNewsTile extends StatelessWidget {
                   news.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                 ),
-                SizedBox(height: 4), // Kasih jarak dikit biar gak nempel
+                SizedBox(height: 12), // Kasih jarak dikit biar gak nempel
                 
                 // === INI BAGIAN BARU BUAT AVATAR USER ===
                 Row(
@@ -91,7 +91,7 @@ class LatestNewsTile extends StatelessWidget {
                       ),
                     ),
                     
-                    SizedBox(width: 8), // Jarak antara foto dan nama
+                    SizedBox(width: 10), // Jarak antara foto dan nama
                     
                     Expanded(
                       child: Text(

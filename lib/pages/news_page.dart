@@ -201,9 +201,6 @@ class _NewsPageState extends State<NewsPage> {
 
                 ],
               )
-              
-              
-              
             ),
           ),
 
@@ -218,7 +215,7 @@ class _NewsPageState extends State<NewsPage> {
                   children: [
                     Padding(
                       padding: EdgeInsetsGeometry.symmetric(horizontal: 20),
-                      child: const Text("Peringkat Harian", style: TextStyle(
+                      child: const Text("Berita Populer", style: TextStyle(
                         fontSize: 28, 
                         fontFamily: 'Montserrat',
                         height: 1.4,
@@ -239,7 +236,7 @@ class _NewsPageState extends State<NewsPage> {
                     ),
 
                     const SizedBox(height: 10,), 
-                    
+
                     // List Berita
                     StreamBuilder<List<Map<String, dynamic>>>(
                       stream: _newsStream,
@@ -280,8 +277,13 @@ class _NewsPageState extends State<NewsPage> {
                           padding: EdgeInsets.only(bottom: 20),
                           itemCount: newsList.length,
                           itemBuilder: (context, index) {
-                            final item = newsList[index];
-                            
+                            final item = newsList[index]; 
+                            final userImagePlaceholder = item.userpicture; 
+                            final userImageUrl = supabase.storage.from('aquaverse')
+                              .getPublicUrl('assets/images/news/$userImagePlaceholder'); 
+
+                            final monthShort = DateFormat('MMMM', 'id_ID').format(item.publishTime);
+
                             // --- CARD DESIGN (Float & Rounded) ---
                             return Card(
                               margin: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -322,7 +324,7 @@ class _NewsPageState extends State<NewsPage> {
                                             // Kategori
                                             Text(
                                               item.category, 
-                                              style: TextStyle(color: Colors.blue, fontSize: 11, fontWeight: FontWeight.w700)
+                                              style: TextStyle(color: Colors.black.withValues(alpha: 0.5), fontSize: 11, fontWeight: FontWeight.w700)
                                             ),
                                             SizedBox(height: 4),
                                             // Judul
@@ -336,8 +338,18 @@ class _NewsPageState extends State<NewsPage> {
                                             // Author & Tanggal
                                             Row(
                                               children: [
-                                                Icon(Icons.person_outline, size: 14, color: Colors.grey),
-                                                SizedBox(width: 4),
+                                                Container(
+                                                  height: 22, 
+                                                  width: 22, 
+                                                  decoration: BoxDecoration(
+                                                    borderRadius: BorderRadius.circular(100),
+                                                    image: DecorationImage(
+                                                      image: NetworkImage(userImageUrl), 
+                                                      fit: BoxFit.cover
+                                                    )
+                                                  ),
+                                                ), 
+                                                SizedBox(width: 8),
                                                 Expanded(
                                                   child: Text(
                                                     item.author,
@@ -345,9 +357,9 @@ class _NewsPageState extends State<NewsPage> {
                                                     style: TextStyle(fontSize: 11, color: Colors.grey[600]),
                                                   ),
                                                 ),
-                                                Text("• ", style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                                                Text("| ", style: TextStyle(fontSize: 11, color: Colors.grey[600])),
                                                 Text(
-                                                  "${item.publishTime.day}/${item.publishTime.month}",
+                                                  "${item.publishTime.day} $monthShort",
                                                   style: TextStyle(fontSize: 11, color: Colors.grey[600])
                                                 ),
                                               ],

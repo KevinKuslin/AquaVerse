@@ -419,7 +419,7 @@ class _HomePageState extends State<HomePage> {
 
                     // ===== SECTION LATEST NEWS CAROUSEL =====
                     SizedBox(
-                      height: 270, 
+                      height: 280, 
                       child: FutureBuilder<List<News>>(
                         future: _newsFuture,
                         builder: (context, snapshot) {
