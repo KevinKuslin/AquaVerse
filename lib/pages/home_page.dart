@@ -1,5 +1,3 @@
-// ignore_for_file: deprecated_member_use, avoid_print, use_build_context_synchronously
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -16,16 +14,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String userName = "Diver";
+  String _rankName = "Shore Beginner";
 
-  // Progress Statis
   int _streak = 0;
   int _points = 0;
   double _dailych = 0.0;
 
-  // --- LOGIC RANK BARU ---
   String _nextRankMessage = "Memuat data...";
   String? _nextBadgeUrl;
-  // -----------------------
   
   late Future<List<News>> _newsFuture = fetchNews();
 
@@ -40,29 +36,30 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _getUserInfo(); 
-    _getUserProgress(); // Logic Streak & Rank jalan di sini
+    _getUserProgress();
     _startAutoScroll();
   }
 
-  /// FUNGSI UTAMA: Update Streak & Ambil Data Rank
-  Future<void> _getUserProgress() async {
+Future<void> _getUserProgress() async {
     final user = Supabase.instance.client.auth.currentUser;
     final supabase = Supabase.instance.client;
 
     if (user != null) {
       try {
-        // 1. Ambil data progress user (termasuk tanggal terakhir login)
         final progressResponse = await supabase
             .from('user_progress')
-            .select('streak, points, dailych, last_active_date')
-            .eq('id', user.id)
-            .single();
+            .select('streak, last_active_date') 
+            .eq('user_id', user.id)
+            .maybeSingle();
 
-        // --- LOGIC HITUNG STREAK (START) ---
-        int currentStreak = progressResponse['streak'] ?? 0;
-        String? lastDateString = progressResponse['last_active_date']; // Format: YYYY-MM-DD
+        int currentStreak = 0;
+        String? lastDateString;
         
-        // Ambil tanggal hari ini (tanpa jam/menit)
+        if (progressResponse != null) {
+          currentStreak = progressResponse['streak'] ?? 0;
+          lastDateString = progressResponse['last_active_date'];
+        }
+
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
         final todayStr = "${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
@@ -70,90 +67,77 @@ class _HomePageState extends State<HomePage> {
         bool needUpdate = false;
 
         if (lastDateString == null) {
-          // Kasus 1: User baru pertama kali login seumur hidup / data tanggal kosong
           currentStreak = 1;
           needUpdate = true;
         } else {
-          // Parse tanggal dari database
           final lastDate = DateTime.parse(lastDateString);
-          
-          // Hitung selisih hari (Hari ini - Tanggal Terakhir)
-          final difference = today.difference(lastDate).inDays;
+          final dateOnlyLast = DateTime(lastDate.year, lastDate.month, lastDate.day);
+          final difference = today.difference(dateOnlyLast).inDays;
 
-          if (difference == 0) {
-            // Kasus 2: Login di hari yang sama -> Gak usah diapa-apain
-          } else if (difference == 1) {
-            // Kasus 3: Login besoknya (Berurutan) -> Streak Nambah!
+          if (difference == 1) {
             currentStreak += 1;
             needUpdate = true;
           } else if (difference > 1) {
-            // Kasus 4: Bolong lebih dari sehari -> RESET jadi 1
             currentStreak = 1;
             needUpdate = true;
           }
-          // Note: Kalo difference negatif (user ganti tanggal HP mundur), kita abaikan biar gak error
         }
 
-        // Simpan perubahan streak ke Database kalo ada update
         if (needUpdate) {
-          await supabase.from('user_progress').update({
+          await supabase.from('user_progress').upsert({
+            'user_id': user.id,
             'streak': currentStreak,
-            'last_active_date': todayStr, // Update jadi tanggal hari ini
-          }).eq('id', user.id);
+            'last_active_date': todayStr,
+          }, onConflict: 'user_id');
+          
+          print("Streak berhasil di-update ke: $currentStreak");
         }
-        // --- LOGIC HITUNG STREAK (END) ---
 
-        // 2. Ambil data Rank Detail (Buat widget Next Rank)
-        final rankResponse = await supabase
-            .from('profiles')
+final rankResponse = await supabase
+            .from('user_rank')
             .select('''
-              user_rank (
-                points, 
-                ranks (
-                  id,
-                  name,
-                  max_points
-                )
+              points, 
+              ranks (
+                id,
+                name,
+                max_points
               )
             ''')
-            .eq('id', user.id)
-            .single();
+            .eq('user_id', user.id)
+            .maybeSingle();
 
         if (mounted) {
           setState(() {
-            // Update UI dengan data terbaru
-            _streak = currentStreak; 
-            _points = progressResponse['points'] ?? 0;
-            _dailych = (progressResponse['dailych'] ?? 0).toDouble();
-
-            // --- LOGIC TAMPILAN RANK ---
-            final userRank = rankResponse['user_rank'];
+            _streak = currentStreak;
             
-            if (userRank != null) {
-              final rankData = userRank['ranks'];
-              final int currentPoints = userRank['points'];
-              final int rankId = rankData['id'];
-              final String rankName = rankData['name'];
-              final int rankMaxPoint = rankData['max_points'];
+            if (rankResponse != null) {
+              _points = rankResponse['points'] ?? 0;
               
-              // Hitung sisa poin message
-              if (rankName == 'Ocean Sovereign' && rankId == 5) {
-                _nextRankMessage = 'Max Rank Tercapai!';
-              } else {
-                final int pointsNeeded = rankMaxPoint + 1 - currentPoints;
-                _nextRankMessage = 'Hanya dalam $pointsNeeded poin lagi!';
+              final rankData = rankResponse['ranks'];
+              if (rankData != null) {
+                final int rankId = rankData['id']; 
+                final String fetchedRankName = rankData['name'];
+                final int rankMaxPoint = rankData['max_points'];
+
+                _rankName = fetchedRankName; 
+
+                if (fetchedRankName == 'Ocean Sovereign' && rankId == 5) {
+                  _nextRankMessage = 'Max Rank Tercapai!';
+                } else {
+                  final int pointsNeeded = rankMaxPoint + 1 - _points;
+                  _nextRankMessage = 'Hanya dalam $pointsNeeded poin lagi!';
+                }
+
+                String nextRankImage;
+                if(rankId == 1) nextRankImage = 'rank_2_star_voyager.png';
+                else if(rankId == 2) nextRankImage = 'rank_3_apex_swimmer.png';
+                else if(rankId == 3) nextRankImage = 'rank_4_abyss_guardian.png';
+                else nextRankImage = 'rank_5_ocean_sovereign.png';
+
+                _nextBadgeUrl = supabase.storage
+                    .from('aquaverse')
+                    .getPublicUrl('assets/images/ranks/$nextRankImage');
               }
-
-              // Tentukan gambar Badge Selanjutnya
-              String nextRankImage;
-              if(rankId == 1) nextRankImage = 'rank_2_star_voyager.png';
-              else if(rankId == 2) nextRankImage = 'rank_3_apex_swimmer.png';
-              else if(rankId == 3) nextRankImage = 'rank_4_abyss_guardian.png';
-              else nextRankImage = 'rank_5_ocean_sovereign.png';
-
-              _nextBadgeUrl = supabase.storage
-                  .from('aquaverse')
-                  .getPublicUrl('assets/images/ranks/$nextRankImage');
             }
           });
         }
@@ -234,7 +218,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _refreshData() async {
     _newsFuture = fetchNews();
-    _getUserProgress(); // Refresh progress juga pas tarik layar
+    _getUserProgress();
     setState(() {});
   }
 
@@ -309,12 +293,10 @@ class _HomePageState extends State<HomePage> {
                               ),
                               const SizedBox(width: 16),
                               
-                              // Expanded agar text tidak overflow ke kanan
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    // FittedBox bikin font mengecil otomatis kalo namanya kepanjangan
                                     FittedBox(
                                       fit: BoxFit.scaleDown,
                                       alignment: Alignment.centerLeft,
@@ -328,8 +310,8 @@ class _HomePageState extends State<HomePage> {
                                         ),
                                       ),
                                     ),
-                                    const Text(
-                                      'Divers',
+                                    Text(
+                                      _rankName,
                                       style: TextStyle(
                                         fontSize: 14,
                                         color: Color.fromARGB(255, 255, 255, 255),
@@ -553,7 +535,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ),
 
-                    // ===== SECTION TUNGGU APA LAGI (LEVEL UP) =====
+                    // ===== SECTION TUNGGU APA LAGI =====
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 14),
                       child: Text(
