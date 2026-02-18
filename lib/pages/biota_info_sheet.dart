@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -45,6 +46,7 @@ class _BiotaInfoDialogState extends State<_BiotaInfoDialog> {
   static const String bucketName = 'aquaverse';
 
   bool _loading = true;
+  bool _isFavorited = false; // Status favorit
   String? _error;
   Map<String, dynamic>? _row;
 
@@ -52,6 +54,55 @@ class _BiotaInfoDialogState extends State<_BiotaInfoDialog> {
   void initState() {
     super.initState();
     _fetch();
+    _checkFavoriteStatus();
+  }
+
+  // Cek apakah biota ini ada di daftar favorit user
+  Future<void> _checkFavoriteStatus() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final res = await supabase
+          .from('favorit')
+          .select()
+          .eq('user_id', user.id)
+          .eq('biota_id', widget.biotaId)
+          .maybeSingle();
+
+      if (mounted) {
+        setState(() => _isFavorited = res != null);
+      }
+    } catch (e) {
+      debugPrint("Error check favorite: $e");
+    }
+  }
+
+  // Toggle Favorit (Tambah/Hapus)
+  Future<void> _toggleFavorite() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    final wasFavorited = _isFavorited;
+    setState(() => _isFavorited = !wasFavorited); // Optimistic update
+
+    try {
+      if (wasFavorited) {
+        await supabase.from('favorit').delete().match({
+          'user_id': user.id,
+          'biota_id': widget.biotaId,
+        });
+      } else {
+        await supabase.from('favorit').insert({
+          'user_id': user.id,
+          'biota_id': widget.biotaId,
+        });
+      }
+    } catch (e) {
+      debugPrint("Error toggle favorite: $e");
+      if (mounted)
+        setState(() => _isFavorited = wasFavorited); // Revert jika gagal
+    }
   }
 
   Future<void> _fetch() async {
@@ -100,9 +151,6 @@ class _BiotaInfoDialogState extends State<_BiotaInfoDialog> {
       bucket: bucketName,
       path: 'biota_real/$filename',
     );
-
-    // kalau import _DivePageState bikin error karena private,
-    // ganti 3 baris ini dengan fungsi local (lihat catatan di bawah)
     return _withVersion(base, updatedAt);
   }
 
@@ -147,7 +195,12 @@ class _BiotaInfoDialogState extends State<_BiotaInfoDialog> {
                             onClose: () => Navigator.pop(context),
                           ),
                         )
-                      : _Content(row: _row!, imageUrl: _realImageUrl(_row!)),
+                      : _Content(
+                          row: _row!,
+                          imageUrl: _realImageUrl(_row!),
+                          isFavorited: _isFavorited,
+                          onFavoriteToggle: _toggleFavorite,
+                        ),
                 ),
               ),
             ),
@@ -161,7 +214,15 @@ class _BiotaInfoDialogState extends State<_BiotaInfoDialog> {
 class _Content extends StatelessWidget {
   final Map<String, dynamic> row;
   final String? imageUrl;
-  const _Content({required this.row, required this.imageUrl});
+  final bool isFavorited;
+  final VoidCallback onFavoriteToggle;
+
+  const _Content({
+    required this.row,
+    required this.imageUrl,
+    required this.isFavorited,
+    required this.onFavoriteToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -215,6 +276,14 @@ class _Content extends StatelessWidget {
                   ],
                 ),
               ),
+              // Tombol Favorit (Love)
+              IconButton(
+                onPressed: onFavoriteToggle,
+                icon: Icon(
+                  isFavorited ? Icons.favorite : Icons.favorite_border,
+                  color: isFavorited ? Colors.redAccent : Colors.white,
+                ),
+              ),
               IconButton(
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close),
@@ -225,7 +294,7 @@ class _Content extends StatelessWidget {
 
           const SizedBox(height: 10),
 
-          // Image (center)
+          // Image
           if (imageUrl != null)
             ClipRRect(
               borderRadius: BorderRadius.circular(20),
@@ -247,11 +316,9 @@ class _Content extends StatelessWidget {
           const SizedBox(height: 12),
 
           // Chips
-          // Chips (1 baris, kalau kepanjangan bisa scroll)
           if (depth != null || status.isNotEmpty) ...[
-            const SizedBox(height: 10),
             SizedBox(
-              height: 34, // biar rapi & gak dorong layout
+              height: 34,
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -321,7 +388,6 @@ class _Content extends StatelessWidget {
 
           const SizedBox(height: 10),
 
-          // Single CTA (optional)
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
@@ -348,6 +414,7 @@ class _Content extends StatelessWidget {
   }
 }
 
+// Sub-widgets tetap sama (_Section, _StatPill, _LoadingView, _ErrorBox)
 class _Section extends StatelessWidget {
   final IconData icon;
   final String title;

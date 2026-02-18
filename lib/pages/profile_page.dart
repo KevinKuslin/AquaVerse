@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'login_page.dart';
 import 'terms_page.dart';
 import 'edit_profile.dart';
+import 'biota_favorite_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -228,7 +229,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const Text(
-                              'Exploration Statistics',
+                              'Statistik & Aktivitas',
                               style: TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 18,
@@ -247,7 +248,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     icon: Icons.monetization_on,
                                     iconColor: const Color(0xFFF5B800),
                                     value: '$points',
-                                    label: 'Total Point (Coins)',
+                                    label: 'Total Poin (Coins)',
                                   ),
                                 ),
                                 const SizedBox(width: 10),
@@ -256,7 +257,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     icon: Icons.quiz,
                                     iconColor: baseColor,
                                     value: '$quizCount',
-                                    label: 'Quiz Attempts',
+                                    label: 'Jumlah Quiz',
                                   ),
                                 ),
                               ],
@@ -267,14 +268,21 @@ class _ProfilePageState extends State<ProfilePage> {
                             _OutlineTile(
                               icon: Icons.favorite_border,
                               iconColor: Colors.redAccent,
-                              title: 'Favorite Collections',
-                              onTap: () {},
+                              title: 'Biota Favorit',
+                              onTap: () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => const BiotaFavoritePage(),
+                                  ),
+                                );
+                              },
                             ),
 
                             const SizedBox(height: 18),
 
                             const Text(
-                              'Account Settings',
+                              'Pengaturan Akun',
                               style: TextStyle(
                                 fontFamily: 'Montserrat',
                                 fontSize: 18,
@@ -286,7 +294,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
                             _OutlineTile(
                               icon: Icons.person_outline,
-                              title: 'Edit Profile & Account',
+                              title: 'Edit Profile & Akun',
                               onTap: () {
                                 Navigator.push(
                                   context,

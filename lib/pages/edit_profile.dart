@@ -317,33 +317,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 12),
-                                SizedBox(
-                                  width: 62,
-                                  height: 56,
-                                  child: ElevatedButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color.fromARGB(
-                                        255,
-                                        221,
-                                        244,
-                                        255,
-                                      ),
-                                      foregroundColor: const Color.fromRGBO(
-                                        63,
-                                        68,
-                                        102,
-                                        1,
-                                      ),
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                    ),
-                                    child: const Icon(Icons.reply, size: 26),
-                                  ),
-                                ),
                               ],
                             ),
 
