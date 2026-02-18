@@ -144,7 +144,7 @@ class _QuizPageState extends State<QuizPage> {
           final double userProgress; 
           if(rankName == 'Ocean Sovereign' && rankId == 5){
             userProgress = 1; 
-            nextRankMessage = 'Kau sudah di Rank tertinggi!'; 
+            nextRankMessage = 'Kamu sudah di Rank tertinggi!'; 
             pointIndicator = '100++';  
           }
           else{
