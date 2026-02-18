@@ -141,7 +141,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
 
           Positioned(
-            top: 230,
+            top: 140,
             left: 0,
             right: 0, 
             bottom: 0,
@@ -229,43 +229,7 @@ class _LoginPageState extends State<LoginPage> {
                         height: 45,
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color.fromRGBO(
-                              105,
-                              202,
-                              249,
-                              1,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                          ),
-                          onPressed: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RegisterPage(),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "Registrasi",
-                            style: TextStyle(fontSize: 13, color: Colors.black),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      SizedBox(
-                        width: double.infinity,
-                        height: 45,
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color.fromRGBO(
-                              39,
-                              46,
-                              94,
-                              1,
-                            ),
+                            backgroundColor: const Color.fromRGBO(39, 46, 94, 1),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -290,6 +254,39 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       const SizedBox(height: 20),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            "Belum punya akun? ",
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Color.fromRGBO(45, 45, 45, 1),
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const RegisterPage(),
+                                ),
+                              );
+                            },
+                            child: const Text(
+                              "Registrasi",
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color.fromRGBO(105, 202, 249, 1), // Warna biru muda khas AquaVerse
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      
+                      const SizedBox(height: 10),
                     ],
                   ),
                 ),
