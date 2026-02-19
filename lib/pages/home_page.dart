@@ -482,10 +482,10 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                     ),
                                     Text(
-                                      _rankName,                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        color: Color.fromARGB(255, 255, 255, 255),
+                                      _rankName,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color.fromARGB(255, 255, 255, 255), 
                                       ),
                                     ),
                                   ],

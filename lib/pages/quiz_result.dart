@@ -375,7 +375,7 @@ class ResultCard extends StatelessWidget {
                             fontFamily: 'Afacad', 
                             height: 1.0,
                             fontWeight: FontWeight.bold,
-                            color: Color.fromRGBO(28, 133, 153, 1)
+                            color: Color.fromRGBO(28, 133, 153, 1), 
                           )), 
                           const SizedBox(height: 5), 
                           Text('Soal', style: TextStyle(

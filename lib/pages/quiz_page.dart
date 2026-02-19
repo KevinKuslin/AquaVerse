@@ -145,7 +145,7 @@ class _QuizPageState extends State<QuizPage> {
           if(rankName == 'Ocean Sovereign' && rankId == 5){
             userProgress = 1; 
             nextRankMessage = 'Kamu sudah di Rank tertinggi!'; 
-            pointIndicator = '100++';  
+            pointIndicator = '100+';  
           }
           else{
             userProgress = (points - rankMinPoint) / (rankMaxPoint - rankMinPoint + 1); 
@@ -491,7 +491,6 @@ class ProfilPrestasi extends StatelessWidget {
                                 fontSize: 13,
                                 )),
                         ), 
-                        const SizedBox(height: 1,), 
                         Text(name, style: TextStyle(
                           fontSize: 18, 
                           fontWeight: FontWeight.bold, 
