@@ -18,6 +18,7 @@ class _HomePageState extends State<HomePage> {
   String userName = "Diver";
   String _rankName = "Shore Beginner";
   String? _currentBadgeUrl;
+  String _accountAge = "- Hari";
 
   int _streak = 0;
   int _points = 0;
@@ -239,9 +240,9 @@ class _HomePageState extends State<HomePage> {
             int quizTarget = questData['quiz_target'] ?? 0;
             int fishTarget = questData['fish_target'] ?? 0;
 
-            int newsDone = questData['news_read'] ?? 0;      // FIX: news_read
-            int quizDone = questData['quiz_played'] ?? 0;    // FIX: quiz_played
-            int fishDone = questData['fish_scanned'] ?? 0;   // FIX: fish_scanned
+            int newsDone = questData['news_read'] ?? 0;      
+            int quizDone = questData['quiz_played'] ?? 0;    
+            int fishDone = questData['fish_scanned'] ?? 0;   
 
             int totalTarget = newsTarget + quizTarget + fishTarget;
             int totalDone = newsDone + quizDone + fishDone;
@@ -280,7 +281,7 @@ class _HomePageState extends State<HomePage> {
 
                 // --- HITUNG PROGRESS RANK ---
                 int range = rankMaxPoint - rankMinPoint;
-                if (range <= 0) range = 1; // Cegah bagi 0
+                if (range <= 0) range = 1; 
                 
                 double progress = (_points - rankMinPoint) / range;
                 _rankProgress = progress.clamp(0.0, 1.0);
@@ -288,7 +289,7 @@ class _HomePageState extends State<HomePage> {
 
                 if (fetchedRankName == 'Ocean Sovereign' && rankId == 5) {
                   _nextRankMessage = 'Max Rank Tercapai!';
-                  _rankProgress = 1.0; // Penuh
+                  _rankProgress = 1.0; 
                 } else {
                   final int pointsNeeded = rankMaxPoint + 1 - _points;
                   _nextRankMessage = 'Hanya dalam $pointsNeeded poin lagi!';
@@ -324,12 +325,37 @@ class _HomePageState extends State<HomePage> {
       try {
         final response = await supabase
             .from('profiles')
-            .select('name')
+            .select('name, created_at')
             .eq('id', user.id)
             .maybeSingle();
 
-        if (response != null && response['name'] != null) {
-          fetchedName = response['name'];
+        if (response != null) {
+          if (response['name'] != null) fetchedName = response['name'];
+
+          if (response['created_at'] != null) {
+            DateTime createdAt = DateTime.parse(response['created_at']);
+            DateTime now = DateTime.now();
+            int days = now.difference(createdAt).inDays;
+
+            String ageStr;
+            if (days == 0) {
+              ageStr = '1 Hari'; 
+            } else if (days < 30) {
+              ageStr = '$days Hari';
+            } else if (days < 365) {
+              int months = (days / 30).floor();
+              ageStr = '$months Bulan';
+            } else {
+              int years = (days / 365).floor();
+              ageStr = '$years Tahun';
+            }
+
+            if (mounted) {
+              setState(() {
+                _accountAge = ageStr;
+              });
+            }
+          }
         }
       } catch (e) {
         debugPrint("Gagal ambil dari tabel profiles, mencoba metadata... Error: $e");
@@ -409,6 +435,49 @@ class _HomePageState extends State<HomePage> {
     _timer?.cancel();
     _pageController.dispose();
     super.dispose();
+  }
+
+  Widget _buildStatTile({
+    required IconData icon, 
+    required String value, 
+    required String label, 
+    Color iconColor = const Color.fromRGBO(10, 78, 236, 1)
+  }) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08), 
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: iconColor, size: 36),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 15, fontFamily: 'Montserrat', fontWeight: FontWeight.w700),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis, 
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 10, color: Color.fromARGB(255, 120, 120, 120)),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -539,47 +608,28 @@ class _HomePageState extends State<HomePage> {
 
                           const SizedBox(height: 12),
 
-                          Container(
-                            padding: const EdgeInsets.symmetric(vertical: 20),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.withValues(alpha: 0.2),
-                                  blurRadius: 3,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: IntrinsicHeight(
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                children: [
-                                  Expanded(
-                                    child: Column(
-                                      children: [
-                                        const Icon(Icons.sailing, color: Color.fromRGBO(10, 78, 236, 1), size: 40),
-                                        const SizedBox(height: 4),
-                                        Text('$_streak Hari', style: const TextStyle(fontSize: 22, fontFamily: 'Montserrat', fontWeight: FontWeight.w700)),
-                                        const Text('Berlayar Terus', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Color.fromARGB(255, 120, 120, 120))),
-                                      ],
-                                    ),
-                                  ),
-                                  const VerticalDivider(color: Colors.grey, thickness: 1),
-                                  Expanded(
-                                    child: Column(
-                                      children: [
-                                        const Icon(Icons.star, color: Color.fromRGBO(10, 78, 236, 1), size: 40),
-                                        const SizedBox(height: 4),
-                                        Text('$_points', style: const TextStyle(fontSize: 22, fontFamily: 'Montserrat', fontWeight: FontWeight.w700)),
-                                        const Text('Poin', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: Color.fromARGB(255, 120, 120, 120))),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              _buildStatTile(
+                                icon: Icons.sailing,
+                                value: _accountAge,
+                                label: 'Berlayar Terus',
                               ),
-                            ),
+                              const SizedBox(width: 12),
+                              _buildStatTile(
+                                icon: Icons.local_fire_department,
+                                iconColor: Colors.deepOrange,
+                                value: '$_streak Hari',
+                                label: 'Streak Harian',
+                              ),
+                              const SizedBox(width: 12),
+                              _buildStatTile(
+                                icon: Icons.star,
+                                value: '$_points',
+                                label: 'Total Poin',
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -860,7 +910,7 @@ class _HomePageState extends State<HomePage> {
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(5),
                                       child: LinearProgressIndicator(
-                                        value: _rankProgress, // Udah idup!
+                                        value: _rankProgress, 
                                         minHeight: 6,
                                         // ignore: deprecated_member_use
                                         backgroundColor: Colors.white.withOpacity(0.5),
